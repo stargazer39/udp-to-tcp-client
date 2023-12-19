@@ -17,14 +17,20 @@ type UDPOverTCP struct {
 	totalReceived float32
 	sentMut       sync.RWMutex
 	recvMut       sync.RWMutex
+	udpPortMut    sync.Mutex
+	udpPort       net.Addr
 }
 
 func New(tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) *UDPOverTCP {
+	portMut := sync.Mutex{}
+	portMut.Lock()
+
 	return &UDPOverTCP{
 		tcpAddr:    tcpAddr,
 		udpAddr:    udpAddr,
 		bufferSize: 8192,
 		logger:     log.Default(),
+		udpPortMut: portMut,
 	}
 }
 
@@ -36,6 +42,9 @@ func (ut *UDPOverTCP) Start(ctx context.Context) error {
 		ut.logger.Println(err)
 		return err
 	}
+
+	ut.udpPort = uConn.LocalAddr()
+	ut.udpPortMut.Unlock()
 
 	ut.logger.Println("Listening on UDP", uConn.LocalAddr())
 
@@ -118,6 +127,13 @@ func (ut *UDPOverTCP) GetTotal() (float32, float32) {
 	ut.recvMut.RLock()
 	defer ut.recvMut.RUnlock()
 	return ut.totalReceived, ut.totalSent
+}
+
+func (ut *UDPOverTCP) GetUDPAddr() net.Addr {
+	ut.udpPortMut.Lock()
+	defer ut.udpPortMut.Unlock()
+
+	return ut.udpPort
 }
 
 func copyServerToUDP(ctx context.Context, conn *net.TCPConn, cConn *net.UDPConn, uAddr net.UDPAddr, logger *log.Logger, written func(i int)) {

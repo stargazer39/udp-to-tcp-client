@@ -13,7 +13,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// Client implementation
-	udpAddrStr := flag.String("u", ":1986", "UDP from addr")
+	udpAddrStr := flag.String("u", ":0", "UDP from addr")
 	tcpAddrStr := flag.String("h", "139.162.51.182:8088", "Host server addr")
 
 	flag.Parse()
@@ -44,6 +44,7 @@ func TestMain(m *testing.M) {
 	handle := New(tcpAddr, udpAddr)
 
 	go func() {
+		log.Println(handle.GetUDPAddr())
 		for {
 			log.Println(handle.GetTotal())
 			time.Sleep(time.Second)
