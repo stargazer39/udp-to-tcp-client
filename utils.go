@@ -1,4 +1,4 @@
-package main
+package udptotcpclient
 
 import (
 	"encoding/binary"

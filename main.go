@@ -1,53 +1,24 @@
-package main
+package udptotcpclient
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"time"
 )
 
 const UDP_BUFFER_SIZE = 8192
 
-func main() {
-	// Client implementation
-
-	udpAddrStr := flag.String("u", ":51280", "UDP from addr")
-	tcpAddrStr := flag.String("h", "139.162.51.182:8088", "Host server addr")
-
-	flag.Parse()
-
-	udpAddr, err := net.ResolveUDPAddr("udp", *udpAddrStr)
-
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	// Initialize TCP client
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", *tcpAddrStr)
-
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := ServeUDPOverTCP(tcpAddr, udpAddr); err != nil {
-		time.Sleep(time.Second)
-	}
-}
-
-func ServeUDPOverTCP(tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) error {
+func ServeUDPOverTCP(ctx context.Context, tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) error {
 	// Dial to the address with UDP
 	uConn, err := net.ListenUDP("udp", udpAddr)
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Println(err)
+		return err
 	}
+
+	defer uConn.Close()
 
 	// Connect to the address with tcp
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
@@ -64,10 +35,11 @@ func ServeUDPOverTCP(tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) error {
 
 	fails := 0
 
-	udpCopyContext, cancel := context.WithCancel(context.Background())
+	udpCopyContext, cancel := context.WithCancel(ctx)
 
 	defer cancel()
 
+out:
 	for {
 	tryAgain:
 
@@ -97,7 +69,16 @@ func ServeUDPOverTCP(tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) error {
 			log.Println("got 1st packet. copying server to udp")
 			go copyServerToUDP(udpCopyContext, conn, uConn, *ad)
 		}
+
+		select {
+		case <-ctx.Done():
+			log.Println("copyServerToUDP context canceled")
+			break out
+		default:
+		}
 	}
+
+	return fmt.Errorf("context was canceled")
 }
 
 func copyServerToUDP(ctx context.Context, conn *net.TCPConn, cConn *net.UDPConn, uAddr net.UDPAddr) {
