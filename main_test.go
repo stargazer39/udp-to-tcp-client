@@ -13,7 +13,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// Client implementation
-	udpAddrStr := flag.String("u", ":51280", "UDP from addr")
+	udpAddrStr := flag.String("u", ":1986", "UDP from addr")
 	tcpAddrStr := flag.String("h", "139.162.51.182:8088", "Host server addr")
 
 	flag.Parse()
@@ -35,12 +35,15 @@ func TestMain(m *testing.M) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	defer cancel()
 	go func() {
 		time.Sleep(time.Second * 60)
-		cancel()
+		// cancel()
 	}()
 
-	if err := ServeUDPOverTCP(ctx, tcpAddr, udpAddr); err != nil {
+	handle := New(tcpAddr, udpAddr)
+
+	if err := handle.Start(ctx); err != nil {
 		log.Println(err)
 	}
 }
