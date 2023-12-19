@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -30,7 +28,6 @@ func main() {
 	}
 
 	// Initialize TCP client
-
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", *tcpAddrStr)
 
 	if err != nil {
@@ -38,7 +35,12 @@ func main() {
 		os.Exit(1)
 	}
 
-retry:
+	if err := ServeUDPOverTCP(tcpAddr, udpAddr); err != nil {
+		time.Sleep(time.Second)
+	}
+}
+
+func ServeUDPOverTCP(tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) error {
 	// Dial to the address with UDP
 	uConn, err := net.ListenUDP("udp", udpAddr)
 
@@ -47,14 +49,6 @@ retry:
 		os.Exit(1)
 	}
 
-	if err := ServeUDPOverTCP(tcpAddr, uConn); err != nil {
-		uConn.Close()
-		time.Sleep(time.Second)
-		goto retry
-	}
-}
-
-func ServeUDPOverTCP(tcpAddr *net.TCPAddr, uConn *net.UDPConn) error {
 	// Connect to the address with tcp
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 
@@ -128,48 +122,4 @@ func copyServerToUDP(ctx context.Context, conn *net.TCPConn, cConn *net.UDPConn,
 			break
 		}
 	}
-}
-
-func sendBuffer(buffer []byte, conn net.Conn) error {
-	length := make([]byte, 2)
-
-	binary.LittleEndian.PutUint16(length, uint16(len(buffer)))
-
-	i, err := conn.Write(length)
-
-	if err != nil {
-		return err
-	}
-
-	if i != len(length) {
-		log.Fatal("len")
-	}
-
-	j, err := conn.Write(buffer)
-
-	if err != nil {
-		return err
-	}
-
-	if j != len(buffer) {
-		log.Fatal("buf")
-	}
-
-	return nil
-}
-
-func recvbuffer(conn net.Conn) ([]byte, error) {
-	length := make([]byte, 2)
-
-	if _, err := io.ReadFull(conn, length); err != nil {
-		return nil, err
-	}
-
-	msg := make([]byte, binary.LittleEndian.Uint16(length))
-
-	if _, err := io.ReadFull(conn, msg); err != nil {
-		return nil, err
-	}
-
-	return msg, nil
 }
