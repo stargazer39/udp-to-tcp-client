@@ -66,8 +66,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		log.Println("size", n)
-
 		if err := sendBuffer(udpFrame[:n], conn); err != nil {
 			log.Println(err)
 			break
