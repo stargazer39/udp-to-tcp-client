@@ -86,7 +86,6 @@ func copyServerToUDP(conn *net.TCPConn, cConn *net.UDPConn, uAddr net.UDPAddr) {
 	for {
 		buf, err := recvbuffer(conn)
 
-		log.Println(len(buf), "dffd")
 		if err != nil {
 			log.Println(err)
 			break
@@ -137,8 +136,6 @@ func recvbuffer(conn net.Conn) ([]byte, error) {
 	if _, err := io.ReadFull(conn, length); err != nil {
 		return nil, err
 	}
-
-	log.Println(binary.LittleEndian.Uint16(length), "pppp")
 
 	msg := make([]byte, binary.LittleEndian.Uint16(length))
 
