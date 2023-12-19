@@ -5,13 +5,18 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 )
 
 type UDPOverTCP struct {
-	tcpAddr    *net.TCPAddr
-	udpAddr    *net.UDPAddr
-	bufferSize int
-	logger     *log.Logger
+	tcpAddr       *net.TCPAddr
+	udpAddr       *net.UDPAddr
+	bufferSize    int
+	logger        *log.Logger
+	totalSent     float32
+	totalReceived float32
+	sentMut       sync.RWMutex
+	recvMut       sync.RWMutex
 }
 
 func New(tcpAddr *net.TCPAddr, udpAddr *net.UDPAddr) *UDPOverTCP {
@@ -68,6 +73,10 @@ out:
 
 		n, ad, err := uConn.ReadFromUDP(udpFrame)
 
+		ut.sentMut.Lock()
+		ut.totalSent += float32(n) / 1024
+		ut.sentMut.Unlock()
+
 		// log.Println("got udp ", n)
 		if err != nil {
 			fails++
@@ -84,7 +93,11 @@ out:
 		if !started {
 			started = true
 			ut.logger.Println("got 1st packet. copying server to udp")
-			go copyServerToUDP(udpCopyContext, conn, uConn, *ad, ut.logger)
+			go copyServerToUDP(udpCopyContext, conn, uConn, *ad, ut.logger, func(i int) {
+				ut.recvMut.Lock()
+				ut.totalReceived += float32(n) / 1024
+				ut.recvMut.Unlock()
+			})
 		}
 
 		select {
@@ -98,7 +111,16 @@ out:
 	return fmt.Errorf("context was canceled")
 }
 
-func copyServerToUDP(ctx context.Context, conn *net.TCPConn, cConn *net.UDPConn, uAddr net.UDPAddr, logger *log.Logger) {
+func (ut *UDPOverTCP) GetTotal() (float32, float32) {
+	ut.sentMut.RLock()
+	defer ut.sentMut.RUnlock()
+
+	ut.recvMut.RLock()
+	defer ut.recvMut.RUnlock()
+	return ut.totalReceived, ut.totalSent
+}
+
+func copyServerToUDP(ctx context.Context, conn *net.TCPConn, cConn *net.UDPConn, uAddr net.UDPAddr, logger *log.Logger, written func(i int)) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,6 +131,7 @@ func copyServerToUDP(ctx context.Context, conn *net.TCPConn, cConn *net.UDPConn,
 
 		buf, err := recvbuffer(conn)
 
+		written(len(buf))
 		if err != nil {
 			logger.Println(err)
 			break

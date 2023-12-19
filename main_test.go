@@ -43,6 +43,12 @@ func TestMain(m *testing.M) {
 
 	handle := New(tcpAddr, udpAddr)
 
+	go func() {
+		for {
+			log.Println(handle.GetTotal())
+			time.Sleep(time.Second)
+		}
+	}()
 	if err := handle.Start(ctx); err != nil {
 		log.Println(err)
 	}
