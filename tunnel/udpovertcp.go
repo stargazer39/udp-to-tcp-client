@@ -17,13 +17,13 @@ type UDPOverTCP struct {
 	tcpAddress string
 }
 
-func NewTunnelFromAddr(ctx context.Context, tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) (*UDPOverTCP, error) {
+func NewTunnelFromAddr(ctx context.Context, tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) *UDPOverTCP {
 	return &UDPOverTCP{
 		tls:        enableTLS,
 		tcpAddress: tcpAddress,
 		udpAddress: udpAddress,
 		tlsConfig:  tlsConfig,
-	}, nil
+	}
 }
 
 func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsConfig *tls.Config) (net.Conn, error) {

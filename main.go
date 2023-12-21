@@ -19,11 +19,7 @@ func main() {
 
 	defer cancel()
 
-	handle, err := tunnel.NewTunnelFromAddr(ctx, *tcpAddrStr, *udpAddrStr, false, nil)
-
-	if err != nil {
-		log.Fatal(err)
-	}
+	handle := tunnel.NewTunnelFromAddr(ctx, *tcpAddrStr, *udpAddrStr, false, nil)
 
 	if err := handle.Start(ctx); err != nil {
 		log.Println(err)
