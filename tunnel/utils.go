@@ -1,4 +1,4 @@
-package udptotcpclient
+package tunnel
 
 import (
 	"encoding/binary"
