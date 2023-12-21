@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	// TODO - Write Tests
 	// Client implementation
 	udpAddrStr := flag.String("u", ":50899", "UDP from addr")
 	tcpAddrStr := flag.String("h", "139.162.51.182:8088", "Host server addr")
@@ -19,9 +20,14 @@ func main() {
 
 	defer cancel()
 
-	handle := tunnel.NewTunnelFromAddr(ctx, *tcpAddrStr, *udpAddrStr, false, nil)
+	handle := tunnel.NewTunnelFromAddr(*tcpAddrStr, *udpAddrStr, false, nil)
 
-	if err := handle.Start(ctx); err != nil {
+	go func() {
+		log.Println(handle.GetUDPAddr())
+	}()
+
+	if err := handle.Run(ctx); err != nil {
 		log.Println(err)
 	}
+
 }

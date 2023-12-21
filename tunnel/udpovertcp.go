@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -15,14 +16,20 @@ type UDPOverTCP struct {
 	tls        bool
 	tlsConfig  *tls.Config
 	tcpAddress string
+
+	mut sync.Mutex
 }
 
-func NewTunnelFromAddr(ctx context.Context, tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) *UDPOverTCP {
+func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) *UDPOverTCP {
+	mut := sync.Mutex{}
+	mut.Lock()
+
 	return &UDPOverTCP{
 		tls:        enableTLS,
 		tcpAddress: tcpAddress,
 		udpAddress: udpAddress,
 		tlsConfig:  tlsConfig,
+		mut:        mut,
 	}
 }
 
@@ -59,14 +66,19 @@ func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsCon
 }
 
 func (ut *UDPOverTCP) GetUDPAddr() net.Addr {
+	ut.mut.Lock()
+	defer ut.mut.Unlock()
 	return ut.raw.GetUDPAddr()
 }
 
 func (ut *UDPOverTCP) GetTotal() (float32, float32) {
+	ut.mut.Lock()
+	defer ut.mut.Unlock()
+
 	return ut.raw.GetTotal()
 }
 
-func (ut *UDPOverTCP) Start(pCtx context.Context) error {
+func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 	udpAddr, err := net.ResolveUDPAddr("udp4", ut.udpAddress)
 
 	if err != nil {
@@ -79,6 +91,8 @@ func (ut *UDPOverTCP) Start(pCtx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	var started bool
 
 	for {
 		select {
@@ -103,7 +117,13 @@ func (ut *UDPOverTCP) Start(pCtx context.Context) error {
 			return err
 		}
 
+		if started {
+			ut.mut.Lock()
+		}
 		ut.raw = NewFromRaw(uConn, conn)
+		ut.mut.Unlock()
+
+		started = true
 
 		if err := ut.raw.Start(pCtx); err != nil {
 			log.Println("raw", err)
