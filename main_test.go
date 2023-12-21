@@ -53,4 +53,9 @@ func TestMain(m *testing.M) {
 	if err := handle.Start(ctx); err != nil {
 		log.Println(err)
 	}
+
+	time.Sleep(time.Minute * 5)
+	if err := handle.Stop(); err != nil {
+		log.Println(err)
+	}
 }
