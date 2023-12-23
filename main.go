@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"log"
+	"net"
 
 	"github.com/stargazer39/udp-to-tcp-client/tunnel"
 )
@@ -26,12 +27,11 @@ func main() {
 
 	handle := tunnel.NewTunnelFromAddr(*tcpAddrStr, *udpAddrStr, *tlsEnabled, &tls.Config{InsecureSkipVerify: *allowInsercure, ServerName: *tlsSNI})
 
-	go func() {
-		log.Println(handle.GetUDPAddr())
-	}()
+	handle.OnReady("c1", func(udpAddr net.Addr) {
+		log.Println(udpAddr)
+	})
 
 	if err := handle.Run(ctx); err != nil {
 		log.Println(err)
 	}
-
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+type ReadyCallback func(udpAddr net.Addr)
 type UDPOverTCP struct {
 	raw        *UDPOverTCPRaw
 	udpAddress string
@@ -17,19 +18,20 @@ type UDPOverTCP struct {
 	tlsConfig  *tls.Config
 	tcpAddress string
 
-	mut sync.Mutex
+	mut            sync.Mutex
+	readyCallbacks map[string]ReadyCallback
+	readyMapMut    sync.RWMutex
 }
 
 func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) *UDPOverTCP {
-	mut := sync.Mutex{}
-	mut.Lock()
-
 	return &UDPOverTCP{
-		tls:        enableTLS,
-		tcpAddress: tcpAddress,
-		udpAddress: udpAddress,
-		tlsConfig:  tlsConfig,
-		mut:        mut,
+		tls:            enableTLS,
+		tcpAddress:     tcpAddress,
+		udpAddress:     udpAddress,
+		tlsConfig:      tlsConfig,
+		mut:            sync.Mutex{},
+		readyCallbacks: make(map[string]ReadyCallback),
+		readyMapMut:    sync.RWMutex{},
 	}
 }
 
@@ -55,16 +57,27 @@ func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsCon
 	return conn, nil
 }
 
-func (ut *UDPOverTCP) GetUDPAddr() net.Addr {
-	ut.mut.Lock()
-	defer ut.mut.Unlock()
-	return ut.raw.GetUDPAddr()
+func (ut *UDPOverTCP) OnReady(id string, callback ReadyCallback) {
+	ut.readyMapMut.Lock()
+	defer ut.readyMapMut.Unlock()
+
+	if _, ok := ut.readyCallbacks[id]; ok {
+		log.Panic("callback with id ", id, " already exists")
+	}
+
+	ut.readyCallbacks[id] = callback
+}
+
+func (ut *UDPOverTCP) notifyReadiness(udpAddr net.Addr) {
+	ut.readyMapMut.RLock()
+	defer ut.readyMapMut.RUnlock()
+
+	for _, v := range ut.readyCallbacks {
+		go v(udpAddr)
+	}
 }
 
 func (ut *UDPOverTCP) GetTotal() (float32, float32) {
-	ut.mut.Lock()
-	defer ut.mut.Unlock()
-
 	return ut.raw.GetTotal()
 }
 
@@ -81,8 +94,6 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	var started bool
 
 	for {
 		select {
@@ -107,13 +118,10 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 			return err
 		}
 
-		if started {
-			ut.mut.Lock()
-		}
+		ut.mut.Lock()
 		ut.raw = NewFromRaw(uConn, conn)
+		ut.notifyReadiness(ut.raw.GetUDPAddr())
 		ut.mut.Unlock()
-
-		started = true
 
 		if err := ut.raw.Start(pCtx); err != nil {
 			log.Println("raw", err)
