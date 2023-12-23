@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type ReadyCallback func(udpAddr net.Addr)
+type UDPReadyCallback func(udpAddr net.Addr)
 type UDPOverTCP struct {
 	raw        *UDPOverTCPRaw
 	udpAddress string
@@ -19,7 +19,7 @@ type UDPOverTCP struct {
 	tcpAddress string
 
 	mut            sync.Mutex
-	readyCallbacks map[string]ReadyCallback
+	readyCallbacks map[string]UDPReadyCallback
 	readyMapMut    sync.RWMutex
 }
 
@@ -30,7 +30,7 @@ func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tls
 		udpAddress:     udpAddress,
 		tlsConfig:      tlsConfig,
 		mut:            sync.Mutex{},
-		readyCallbacks: make(map[string]ReadyCallback),
+		readyCallbacks: make(map[string]UDPReadyCallback),
 		readyMapMut:    sync.RWMutex{},
 	}
 }
@@ -57,7 +57,7 @@ func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsCon
 	return conn, nil
 }
 
-func (ut *UDPOverTCP) OnReady(id string, callback ReadyCallback) {
+func (ut *UDPOverTCP) OnUDPReady(id string, callback UDPReadyCallback) {
 	ut.readyMapMut.Lock()
 	defer ut.readyMapMut.Unlock()
 
@@ -68,7 +68,7 @@ func (ut *UDPOverTCP) OnReady(id string, callback ReadyCallback) {
 	ut.readyCallbacks[id] = callback
 }
 
-func (ut *UDPOverTCP) RemoveOnReady(id string) {
+func (ut *UDPOverTCP) RemoveOnUDPReady(id string) {
 	ut.readyMapMut.Lock()
 	defer ut.readyMapMut.Unlock()
 

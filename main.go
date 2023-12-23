@@ -27,7 +27,7 @@ func main() {
 
 	handle := tunnel.NewTunnelFromAddr(*tcpAddrStr, *udpAddrStr, *tlsEnabled, &tls.Config{InsecureSkipVerify: *allowInsercure, ServerName: *tlsSNI})
 
-	handle.OnReady("c1", func(udpAddr net.Addr) {
+	handle.OnUDPReady("c1", func(udpAddr net.Addr) {
 		log.Println(udpAddr)
 	})
 
