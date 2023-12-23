@@ -68,6 +68,13 @@ func (ut *UDPOverTCP) OnReady(id string, callback ReadyCallback) {
 	ut.readyCallbacks[id] = callback
 }
 
+func (ut *UDPOverTCP) RemoveOnReady(id string) {
+	ut.readyMapMut.Lock()
+	defer ut.readyMapMut.Unlock()
+
+	delete(ut.readyCallbacks, id)
+}
+
 func (ut *UDPOverTCP) notifyReadiness(udpAddr net.Addr) {
 	ut.readyMapMut.RLock()
 	defer ut.readyMapMut.RUnlock()
