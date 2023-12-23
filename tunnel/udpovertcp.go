@@ -37,30 +37,20 @@ func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsCon
 	log.Println("Connecting to", tcpAddress)
 
 	tcpDialer := net.Dialer{Timeout: time.Second * 30, Deadline: time.Now().Add(time.Second * 30)}
-	var conn net.Conn
 
-	if enableTLS {
-		c, err := tls.DialWithDialer(&tcpDialer, "tcp", tcpAddress, tlsConfig)
+	conn, err := tcpDialer.DialContext(ctx, "tcp", tcpAddress)
 
-		if err != nil {
-			return nil, err
-		}
-
-		conn = c
-	} else {
-		c, err := tcpDialer.DialContext(ctx, "tcp", tcpAddress)
-
-		if err != nil {
-			return nil, err
-		}
-
-		conn = c
+	if err != nil {
+		return nil, err
 	}
 
-	// go func() {
-	// 	time.Sleep(time.Second * 30)
-	// 	conn.Close()
-	// }()
+	if enableTLS {
+		newConn := tls.Client(conn, tlsConfig)
+
+		if err := newConn.HandshakeContext(ctx); err != nil {
+			return nil, err
+		}
+	}
 
 	return conn, nil
 }

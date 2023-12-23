@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"log"
 
@@ -13,6 +14,9 @@ func main() {
 	// Client implementation
 	udpAddrStr := flag.String("u", ":50899", "UDP from addr")
 	tcpAddrStr := flag.String("h", "139.162.51.182:8088", "Host server addr")
+	tlsEnabled := flag.Bool("tls", true, "Enable TLS")
+	tlsSNI := flag.String("sni", "google.com", "TLS SNI")
+	allowInsercure := flag.Bool("insecure", false, "Allow insecure TLS")
 
 	flag.Parse()
 
@@ -20,7 +24,7 @@ func main() {
 
 	defer cancel()
 
-	handle := tunnel.NewTunnelFromAddr(*tcpAddrStr, *udpAddrStr, false, nil)
+	handle := tunnel.NewTunnelFromAddr(*tcpAddrStr, *udpAddrStr, *tlsEnabled, &tls.Config{InsecureSkipVerify: *allowInsercure, ServerName: *tlsSNI})
 
 	go func() {
 		log.Println(handle.GetUDPAddr())
