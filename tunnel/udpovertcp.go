@@ -48,10 +48,10 @@ func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsCon
 
 	if enableTLS {
 		newConn := tls.Client(conn, tlsConfig)
-
 		if err := newConn.HandshakeContext(ctx); err != nil {
 			return nil, err
 		}
+		return newConn, nil
 	}
 
 	return conn, nil
