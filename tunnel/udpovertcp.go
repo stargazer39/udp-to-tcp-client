@@ -38,7 +38,7 @@ func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tls
 func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsConfig *tls.Config) (net.Conn, error) {
 	log.Println("Connecting to", tcpAddress)
 
-	tcpDialer := net.Dialer{Timeout: time.Second * 30, Deadline: time.Now().Add(time.Second * 30)}
+	tcpDialer := net.Dialer{Timeout: time.Second * 5, Deadline: time.Now().Add(time.Second * 5)}
 
 	conn, err := tcpDialer.DialContext(ctx, "tcp", tcpAddress)
 
@@ -102,6 +102,8 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 		return err
 	}
 
+	defer uConn.Close()
+
 	for {
 		select {
 		case <-pCtx.Done():
@@ -125,6 +127,11 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 			return err
 		}
 
+		// go func() {
+		// 	time.Sleep(time.Second * 30)
+		// 	conn.Close()
+		// }()
+
 		ut.mut.Lock()
 		ut.raw = NewFromRaw(uConn, conn)
 		ut.notifyReadiness(ut.raw.GetUDPAddr())
@@ -133,6 +140,8 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 		if err := ut.raw.Start(pCtx); err != nil {
 			log.Println("raw", err)
 		}
+
+		conn.Close()
 
 		log.Println("stopped")
 		time.Sleep(time.Second * 10)
