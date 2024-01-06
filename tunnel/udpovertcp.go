@@ -78,16 +78,11 @@ func (ut *UDPOverTCP) RemoveOnUDPReady(id string) {
 	delete(ut.readyCallbacks, id)
 }
 
-func (ut *UDPOverTCP) notifyReadiness(udpAddr net.Addr) {
-	ut.readyMapMut.RLock()
-	defer ut.readyMapMut.RUnlock()
-
-	for _, v := range ut.readyCallbacks {
-		go v(udpAddr)
-	}
-}
-
 func (ut *UDPOverTCP) GetTotal() (float32, float32) {
+	if ut.raw == nil {
+		return 0, 0
+	}
+
 	return ut.raw.GetTotal()
 }
 
@@ -144,7 +139,6 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 
 		ut.mut.Lock()
 		ut.raw = NewFromRaw(ut.udpConn, conn)
-		ut.notifyReadiness(ut.raw.GetUDPAddr())
 		ut.mut.Unlock()
 
 		if err := ut.raw.Start(pCtx); err != nil {
@@ -152,8 +146,6 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 		}
 
 		conn.Close()
-
-		log.Println("stopped")
 		time.Sleep(time.Second * 10)
 	}
 }
