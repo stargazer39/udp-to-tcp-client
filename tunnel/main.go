@@ -29,7 +29,7 @@ const UDP_TIMEOUT = time.Second * 10
 
 func NewFromRaw(udpConn *net.UDPConn, tcpConn net.Conn) *UDPOverTCPRaw {
 	return &UDPOverTCPRaw{
-		bufferSize: 8192,
+		bufferSize: 2046,
 		logger:     log.Default(),
 		udpConn:    udpConn,
 		tcpConn:    tcpConn,

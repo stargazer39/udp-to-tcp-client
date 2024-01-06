@@ -21,6 +21,8 @@ type UDPOverTCP struct {
 	mut            sync.Mutex
 	readyCallbacks map[string]UDPReadyCallback
 	readyMapMut    sync.RWMutex
+	done           chan error
+	udpConn        *net.UDPConn
 }
 
 func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) *UDPOverTCP {
@@ -32,6 +34,7 @@ func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tls
 		mut:            sync.Mutex{},
 		readyCallbacks: make(map[string]UDPReadyCallback),
 		readyMapMut:    sync.RWMutex{},
+		done:           make(chan error),
 	}
 }
 
@@ -88,21 +91,28 @@ func (ut *UDPOverTCP) GetTotal() (float32, float32) {
 	return ut.raw.GetTotal()
 }
 
-func (ut *UDPOverTCP) Run(pCtx context.Context) error {
+func (ut *UDPOverTCP) Start(ctx context.Context) (net.Addr, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp4", ut.udpAddress)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Dial to the address with UDP
 	uConn, err := net.ListenUDP("udp", udpAddr)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	defer uConn.Close()
+	ut.udpConn = uConn
+
+	return ut.udpConn.LocalAddr(), nil
+}
+
+func (ut *UDPOverTCP) Run(pCtx context.Context) error {
+
+	defer ut.udpConn.Close()
 
 	for {
 		select {
@@ -133,7 +143,7 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 		// }()
 
 		ut.mut.Lock()
-		ut.raw = NewFromRaw(uConn, conn)
+		ut.raw = NewFromRaw(ut.udpConn, conn)
 		ut.notifyReadiness(ut.raw.GetUDPAddr())
 		ut.mut.Unlock()
 
