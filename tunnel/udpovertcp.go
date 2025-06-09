@@ -3,6 +3,8 @@ package tunnel
 import (
 	"context"
 	"crypto/tls"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -25,6 +27,10 @@ type UDPOverTCP struct {
 	udpConn        *net.UDPConn
 }
 
+type FirstMessage struct {
+	Token string `json:"token"`
+}
+
 func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tlsConfig *tls.Config) *UDPOverTCP {
 	return &UDPOverTCP{
 		tls:            enableTLS,
@@ -38,10 +44,12 @@ func NewTunnelFromAddr(tcpAddress string, udpAddress string, enableTLS bool, tls
 	}
 }
 
-func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsConfig *tls.Config) (net.Conn, error) {
+func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsConfig *tls.Config, fm FirstMessage) (net.Conn, error) {
 	log.Println("Connecting to", tcpAddress)
 
 	tcpDialer := net.Dialer{Timeout: time.Second * 5, Deadline: time.Now().Add(time.Second * 5)}
+
+	var finalConn net.Conn
 
 	conn, err := tcpDialer.DialContext(ctx, "tcp", tcpAddress)
 
@@ -54,10 +62,38 @@ func connectToTun(ctx context.Context, tcpAddress string, enableTLS bool, tlsCon
 		if err := newConn.HandshakeContext(ctx); err != nil {
 			return nil, err
 		}
-		return newConn, nil
+		finalConn = newConn
+	} else {
+		finalConn = conn
 	}
 
-	return conn, nil
+	// Send the first message
+	jsonData, err := json.Marshal(fm)
+
+	if err != nil {
+		finalConn.Close()
+		return nil, fmt.Errorf("failed to marshal first message: %w", err)
+	}
+
+	length := make([]byte, 2)
+
+	binary.LittleEndian.PutUint16(length, uint16(len(jsonData)))
+
+	if _, err := finalConn.Write(length); err != nil {
+		finalConn.Close()
+		return nil, fmt.Errorf("failed to write length: %w", err)
+	}
+
+	log.Printf("Sent first message with %d length", len(jsonData))
+
+	if _, err := finalConn.Write(jsonData); err != nil {
+		finalConn.Close()
+		return nil, fmt.Errorf("failed to write first message: %w", err)
+	}
+
+	log.Println("Sent first message to", tcpAddress)
+
+	return finalConn, nil
 }
 
 func (ut *UDPOverTCP) OnUDPReady(id string, callback UDPReadyCallback) {
@@ -105,7 +141,7 @@ func (ut *UDPOverTCP) Start(ctx context.Context) (net.Addr, error) {
 	return ut.udpConn.LocalAddr(), nil
 }
 
-func (ut *UDPOverTCP) Run(pCtx context.Context) error {
+func (ut *UDPOverTCP) Run(pCtx context.Context, firstMsg FirstMessage) error {
 
 	defer ut.udpConn.Close()
 
@@ -119,7 +155,7 @@ func (ut *UDPOverTCP) Run(pCtx context.Context) error {
 		retries := 0
 
 	retry:
-		conn, err := connectToTun(pCtx, ut.tcpAddress, ut.tls, ut.tlsConfig)
+		conn, err := connectToTun(pCtx, ut.tcpAddress, ut.tls, ut.tlsConfig, firstMsg)
 
 		if err != nil {
 			log.Println(err)

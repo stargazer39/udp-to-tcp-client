@@ -18,8 +18,13 @@ func main() {
 	tlsEnabled := flag.Bool("tls", false, "Enable TLS")
 	tlsSNI := flag.String("sni", "google.com", "TLS SNI")
 	allowInsercure := flag.Bool("insecure", false, "Allow insecure TLS")
+	token := flag.String("token", "", "Token for authentication")
 
 	flag.Parse()
+
+	if *token == "" {
+		log.Fatal("Token is required")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -42,7 +47,9 @@ func main() {
 		}
 	}()
 
-	if err := handle.Run(ctx); err != nil {
+	if err := handle.Run(ctx, tunnel.FirstMessage{
+		Token: *token,
+	}); err != nil {
 		log.Println(err)
 	}
 }
